@@ -1,0 +1,54 @@
+# Ignore build output directories
+bin/
+obj/
+
+# Rider specific files
+.idea/
+.idea_modules/
+*.sln.iml
+*.csproj.iml
+/modules.xml
+*.ipr
+*.iws
+/._ReSharper*
+/_ReSharper.Caches/
+/.idea/workspace.xml
+
+# User-specific Rider files
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/dictionaries
+
+# Ignore Rider-specific project files
+riderModule.iml
+
+# Ignore NuGet Packages
+packages/
+*.nupkg
+*.snupkg
+*.nuspec
+
+# Dotnet user settings
+.vscode/
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Ignore compiled files
+*.dll
+*.exe
+*.pdb
+
+# Ignore auto-generated files
+.g.dart/
+*.g.cs
+*.g.i.cs
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
