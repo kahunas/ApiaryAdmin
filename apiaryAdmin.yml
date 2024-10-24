@@ -1,0 +1,674 @@
+openapi: 3.0.0
+info:
+  title: ApiaryAdmin API
+  description: API for managing apiaries, hives and inspections.
+  version: 1.0.0
+servers:
+  - url: http://localhost:5093/api
+
+paths:
+
+  /apiaries:
+    get:
+      summary: List all apiaries.
+      operationId: getAllApiaries
+      tags:
+        - apiary
+      responses:
+        "200":
+          description: An array of apiaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/apiary'
+              examples:
+                example1:
+                  summary: A sample list of apiaries
+                  value:
+                  - apiaryId: 1
+                    name: "Black field apiary"
+                    location: "Farm 2, Kaunas"
+                    description: "Very good apiary."
+                  - apiaryId: 2
+                    name: "White field apiary"
+                    location: "Farm 1, Vilnius"
+                    description: "Very sick apiary."
+        "404":
+          $ref: "#/components/responses/notFound"
+    post:
+      summary: Create apiary
+      operationId: createApiary
+      tags:
+        - apiary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/createApiary'
+            example:
+              name: "Black field apiary"
+              location: "Farm 2, Kaunas"
+              description: "Very good apiary."
+      responses:
+        "201":
+          $ref: "#/components/responses/singleApiary"
+        "400":
+          $ref: "#/components/responses/badRequest"
+        "422":
+          $ref: "#/components/responses/unprocessableEntity"
+
+  /apiaries/{apiaryId}:
+    parameters:
+      - $ref: '#/components/parameters/apiaryId'
+    get:
+      summary: Get apiary
+      operationId: getApiary
+      tags:
+        - apiary
+      responses:
+        "200":
+          $ref: "#/components/responses/singleApiary"
+        "404":
+          $ref: "#/components/responses/notFound"
+    put:
+      summary: Update apiary
+      operationId: updateApiary
+      tags:
+        - apiary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/updateApiary'
+            example:
+              name: "Black field apiary"
+              location: "Farm 2, Kaunas"
+              description: "Very good apiary."
+      responses:
+        "200":
+          $ref: "#/components/responses/singleApiary"
+        "400":
+          $ref: "#/components/responses/badRequest"
+        "404":
+          $ref: "#/components/responses/notFound"
+        "422":
+          $ref: "#/components/responses/unprocessableEntity"
+    delete:
+      summary: Delete apiary
+      operationId: deleteApiary
+      tags:
+        - apiary
+      responses:
+        "404":
+          $ref: "#/components/responses/notFound"
+        "204":
+          description: Apiary deleted
+
+  /apiaries/{apiaryId}/hives:
+    parameters:
+      - $ref: '#/components/parameters/apiaryId'
+    get:
+      summary: List all hives
+      operationId: getHives
+      tags:
+        - hive
+      responses:
+        "200":
+          description: An array of hives
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/hive'
+              example:
+                - id: 1
+                  name: "Yellow hive"
+                  description: "Located on the far right of the apiary"
+                  apiaryId: 1
+                - id: 2
+                  name: "Black hive"
+                  description: "Located on the far left of the apiary"
+                  apiaryId: 1
+    post:
+      summary: Create hive
+      operationId: createHive
+      tags:
+        - hive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/createHive'
+            example:
+              name: "Yellow hive"
+              description: "Located on the far right of the apiary"
+              apiaryId: 1      
+      responses:
+        "201":
+          $ref: "#/components/responses/singleHive"
+        "400":
+          $ref: "#/components/responses/badRequest"
+        "422":
+          $ref: "#/components/responses/unprocessableEntity"
+
+  /apiaries/{apiaryId}/hives/{hiveId}:
+    parameters:
+      - $ref: '#/components/parameters/apiaryId'
+      - $ref: '#/components/parameters/hiveId'
+
+    get:
+      summary: Get hive
+      operationId: getHive
+      tags:
+        - hive
+      responses:
+        "200":
+          $ref: "#/components/responses/singleHive"
+        "404":
+          $ref: "#/components/responses/notFound"
+    put:
+      summary: Update hive
+      operationId: updateHive
+      tags:
+        - hive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/updateHive'
+      responses:
+        "200":
+          $ref: "#/components/responses/singleHive"
+        "400":
+          $ref: "#/components/responses/badRequest"
+        "404":
+          $ref: "#/components/responses/notFound"
+        "422":
+          $ref: "#/components/responses/unprocessableEntity"
+    delete:
+      summary: Delete hive
+      operationId: deleteHive
+      tags:
+        - hive
+      responses:
+        "404":
+          $ref: "#/components/responses/notFound"
+        "204":
+          description: Hive deleted
+
+  /apiaries/{apiaryId}/hives/{hiveId}/inspections:
+    parameters:
+      - $ref: '#/components/parameters/apiaryId'
+      - $ref: '#/components/parameters/hiveId'
+
+    get:
+      summary: List all inspections
+      operationId: getInspections
+      tags:
+        - inspection
+      responses:
+        "200":
+          description: An array of inspections
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/inspection'
+              example:
+                - id: 1
+                  title: "Inspected the queen bee."
+                  notes: "Queen is in good health."
+                  date: "2024-10-23T15:30:00Z"  # Date in ISO 8601 format (UTC)
+                  hiveId: 1
+                - id: 2
+                  title: "Inspected conditon of hive."
+                  notes: "Needs repair."
+                  date: "2024-02-23T15:30:00Z"  # Date in ISO 8601 format (UTC)
+                  hiveId: 1
+    post:
+      summary: Create inspection
+      operationId: createInspection
+      tags:
+        - inspection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/createInspection'
+            example:
+              title: "Inspected the queen bee."
+              notes: "Queen is in good health."
+              date: "2024-10-23T15:30:00Z"  # Date in ISO 8601 format (UTC)
+              hiveId: 1
+      responses:
+        "201":
+          $ref: "#/components/responses/singleInspection"
+        "400":
+          $ref: "#/components/responses/badRequest"
+        "422":
+          $ref: "#/components/responses/unprocessableEntity"
+
+  /apiaries/{apiaryId}/hives/{hiveId}/inspections/{inspectionId}:
+    parameters:
+      - $ref: '#/components/parameters/apiaryId'
+      - $ref: '#/components/parameters/hiveId'
+      - $ref: '#/components/parameters/inspectionId'
+    get:
+      summary: Get inspection
+      operationId: getInspection
+      tags:
+        - inspection
+      responses:
+        "200":
+          $ref: "#/components/responses/singleInspection"
+        "404":
+          $ref: "#/components/responses/notFound"
+    put:
+      summary: Update inspection
+      operationId: updateInspection
+      tags:
+        - inspection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/updateInspection'
+      responses:
+        "200":
+          $ref: "#/components/responses/singleInspection"
+        "400":
+          $ref: "#/components/responses/badRequest"
+        "404":
+          $ref: "#/components/responses/notFound"
+        "422":
+          $ref: "#/components/responses/unprocessableEntity"
+    delete:
+      summary: Delete inspection
+      operationId: deleteInspection
+      tags:
+        - inspection
+      responses:
+        "404":
+          $ref: "#/components/responses/notFound"
+        "204":
+          description: inspection deleted
+
+components:
+  schemas:
+    apiary:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the apiary
+        name:
+          type: string
+          description: Name of the apiary
+        location:
+          type: string
+          description: Location of the apiary
+        description:
+          type: string
+          description: Description of the apiary
+      example:
+        id: 1
+        name: "Black field apiary"
+        location: "Farm 2, Kaunas"
+        description: "Very good apiary."
+
+    createApiary:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          minLength: 2
+          maxLength: 100
+          pattern: "^[a-zA-Z0-9_]+$"  # Only allows letters, numbers, and underscores
+          type: string
+          description: Name of the apiary
+        location:
+          minLength: 2
+          maxLength: 100
+          pattern: "^[a-zA-Z0-9_]+$"  # Only allows letters, numbers, and underscores
+          type: string
+          description: Location of the apiary
+        description:
+          minLength: 2
+          maxLength: 100
+          pattern: "^[a-zA-Z0-9_]+$"  # Only allows letters, numbers, and underscores
+          type: string
+          description: Description of the apiary
+      example:
+        name: "Black field apiary"
+        location: "Farm 2, Kaunas"
+        description: "Very good apiary."
+
+    updateApiary:
+      type: object
+      properties:
+        name:
+          minLength: 2
+          maxLength: 100
+          pattern: "^[a-zA-Z0-9_]+$"  # Only allows letters, numbers, and underscores
+          type: string
+          description: Name of the apiary
+        location:
+          minLength: 2
+          maxLength: 100
+          pattern: "^[a-zA-Z0-9_]+$"  # Only allows letters, numbers, and underscores
+          type: string
+          description: Location of the apiary
+        description:
+          minLength: 2
+          maxLength: 100
+          pattern: "^[a-zA-Z0-9_]+$"  # Only allows letters, numbers, and underscores
+          type: string
+          description: Description of the apiary
+      example:
+        name: "Black field apiary"
+        location: "Farm 2, Kaunas"
+        description: "Very good apiary."
+
+    hive:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the hive
+        name:
+          type: string
+          description: Name of the hive
+        description:
+          type: string
+          description: Description of the hive
+        apiaryId:
+          type: integer
+          description: Unique identifier for the apiary that this hive belongs to
+      example:
+        id: 1
+        name: "Yellow hive"
+        description: "Located on the far right of the apiary"
+        apiaryId: 1
+    
+    createHive:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          minLength: 2
+          maxLength: 100
+          pattern: "^[a-zA-Z0-9_]+$"  # Only allows letters, numbers, and underscores
+          type: string
+          description: Name of the hive
+        description:
+          minLength: 2
+          maxLength: 100
+          pattern: "^[a-zA-Z0-9_]+$"  # Only allows letters, numbers, and underscores
+          type: string
+          description: Description of the hive
+        apiaryId:
+          type: integer
+          description: Unique identifier for the apiary that this hive belongs to
+      example:
+        name: "Yellow hive"
+        description: "Located on the far right of the apiary"
+        apiaryId: 1
+
+    updateHive:
+      type: object
+      properties:
+        name:
+          minLength: 2
+          maxLength: 100
+          pattern: "^[a-zA-Z0-9_]+$"  # Only allows letters, numbers, and underscores
+          type: string
+          description: Name of the hive
+        description:
+          minLength: 2
+          maxLength: 100
+          pattern: "^[a-zA-Z0-9_]+$"  # Only allows letters, numbers, and underscores
+          type: string
+          description: Description of the hive
+        apiaryId:
+          type: integer
+          description: Unique identifier for the apiary that this hive belongs to
+      example:
+        name: "Yellow hive"
+        description: "Located on the far right of the apiary"
+        apiaryId: 1
+
+    inspection:
+      type: object
+      required:
+        - title
+        - date
+        - hiveId
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the inspection
+        title:
+          type: string
+          description: Title of the inspection
+        notes:
+          type: string
+          description: Notes of the inspection
+        date:
+          type: string
+          format: date-time
+          description: Date of the inspection (in ISO 8601 format (UTC))
+        hiveId:
+          type: integer
+          description: Unique identifier for the hive that this inspection belongs to
+      example:
+        id: 1
+        title: "Inspected the queen bee."
+        notes: "Queen is in good health."
+        date: "2024-10-23T15:30:00Z"  # Date in ISO 8601 format (UTC)
+        hiveId: 1
+
+    createInspection:
+      type: object
+      required:
+        - title
+        - date
+        - hiveId
+      properties:
+        title:
+          type: string
+          description: Title of the inspection
+        notes:
+          type: string
+          description: Notes of the inspection
+        date:
+          type: string
+          format: date-time
+          description: Date of the inspection (in ISO 8601 format (UTC))
+        hiveId:
+          type: integer
+          description: Unique identifier for the hive that this inspection belongs to
+      example:
+        title: "Inspected the queen bee."
+        notes: "Queen is in good health."
+        date: "2024-10-23T15:30:00Z"  # Date in ISO 8601 format (UTC)
+        hiveId: 1
+
+    updateInspection:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Title of the inspection
+        notes:
+          type: string
+          description: Notes of the inspection
+        date:
+          type: string
+          format: date-time
+          description: Date of the inspection (in ISO 8601 format (UTC))
+        hiveId:
+          type: integer
+          description: Unique identifier for the hive that this inspection belongs to
+      example:
+        title: "Inspected the queen bee."
+        notes: "Queen is in good health."
+        date: "2024-10-23T15:30:00Z"  # Date in ISO 8601 format (UTC)
+        hiveId: 1
+
+    problemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri
+          description: A URI reference that identifies the problem type.
+        title:
+          type: string
+          description: A short, human-readable summary of the problem type.
+        status:
+          type: integer
+          format: int32
+          description: The HTTP status code applicable to this problem.
+        detail:
+          type: string
+          description: A human-readable explanation specific to this occurrence of the problem.
+        instance:
+          type: string
+          format: uri
+          description: A URI reference that identifies the specific occurrence of the problem.
+        errors:
+          type: object
+          description: A map of detailed errors for every property ([property => error])
+
+  responses:
+    singleApiary:
+      description: Details of a single apiary
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/apiary"
+          example:
+            apiaryId: 1
+            name: "Black field apiary"
+            location: "Farm 2, Kaunas"
+            description: "Very good apiary."
+
+    singleHive:
+      description: Details of a single hive
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/hive"
+          example:
+            id: 1
+            name: "Yellow hive"
+            description: "Located on the far right of the apiary"
+            apiaryId: 1
+
+    singleInspection:
+      description: Details of a single inspection
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/inspection"
+          example:
+            id: 1
+            title: "Inspected the queen bee."
+            notes: "Queen is in good health."
+            date: "2024-10-23T15:30:00Z"  # Date in ISO 8601 format (UTC)
+            hiveId: 1
+                        
+    unprocessableEntity:
+      description: Unprocessable entity response
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            items:
+              $ref: "#/components/schemas/problemDetails"
+          example:
+            type: "https://tools.ietf.org/html/rfc4918#section-11.2"
+            title: "Unprocessable Entity"
+            status: 422
+            errors:
+              Name:
+                - "'Name' must not be empty."
+    badRequest:
+      description: Bad request response
+    notFound:
+      description: Resource was not found
+  parameters:
+    apiaryId:
+      name: apiaryId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      description: The unique identifier of the apiary
+    hiveId:
+      name: hiveId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      description: The unique identifier of the hive
+    inspectionId:
+      name: inspectionId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      description: The unique identifier of the inspection
+
+
+    serviceId:
+      name: serviceId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      description: The unique identifier of the topic
+    reservationId:
+      name: reservationId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      description: The unique identifier of the post
+    reviewId:
+      name: reviewId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      description: The unique identifier of the comment
+  
+tags:
+  - name: apiary
+    description: Operations related to apiaries
+  - name: hive
+    description: Operations related to hives
+  - name: inspection
+    description: Operations related to inspections
+
+externalDocs:
+  description: Find more info here
+  url: https://example.com/docs
