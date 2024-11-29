@@ -1,7 +1,11 @@
-﻿using ApiaryAdmin.Data;
+﻿using System.Security.Claims;
+using ApiaryAdmin.Auth.Model;
+using ApiaryAdmin.Data;
 using ApiaryAdmin.Data.DTOs;
 using ApiaryAdmin.Data.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.JsonWebTokens;
 using SharpGrip.FluentValidation.AutoValidation.Endpoints.Extensions;
 
 namespace ApiaryAdmin;
@@ -21,21 +25,27 @@ public static class Endpoints
             var apiary = await dbContext.Apiaries.FindAsync(apiaryId);
             return apiary is null ? Results.NotFound() : TypedResults.Ok(apiary.ToDto());
         });
-        apiariesGroups.MapPost("/apiaries", async (CreateApiaryDto dto, ApiaryDbContext dbContext) =>
+        apiariesGroups.MapPost("/apiaries", [Authorize(Roles = ApiaryRoles.ApiaryUser)] async (CreateApiaryDto dto, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
-            var apiary = new Apiary { Name = dto.Name, Location = dto.Location, Description = dto.Description, CreationDate = DateTimeOffset.UtcNow};
+            var apiary = new Apiary { Name = dto.Name, Location = dto.Location, Description = dto.Description, CreationDate = DateTimeOffset.UtcNow,
+                UserId = httpContext.User.FindFirstValue((JwtRegisteredClaimNames.Sub))};
             dbContext.Apiaries.Add(apiary);
             
             await dbContext.SaveChangesAsync();
             
             return TypedResults.Created($"/api/apiaries/{apiary.Id}", apiary.ToDto());
         });
-        apiariesGroups.MapPut("/apiaries/{apiaryId}", async (UpdateApiaryDto dto, int apiaryId, ApiaryDbContext dbContext) =>
+        apiariesGroups.MapPut("/apiaries/{apiaryId}", [Authorize] async (UpdateApiaryDto dto, int apiaryId, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
             var apiary = await dbContext.Apiaries.FindAsync(apiaryId);
             if (apiary is null)
             {
                 return Results.NotFound();
+            }
+
+            if (!httpContext.User.IsInRole(ApiaryRoles.Admin) && httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub) != apiary.UserId)
+            {
+                return Results.Forbid();
             }
 
             apiary.Name = dto.Name;
@@ -95,7 +105,7 @@ public static class Endpoints
 
             dbContext.Entry(apiary).State = EntityState.Unchanged;  // Ensure Apiary is tracked
 
-            var hive = new Hive { Name = dto.Name, Description = dto.Description, Apiary = apiary };
+            var hive = new Hive { Name = dto.Name, Description = dto.Description, Apiary = apiary, UserId = ""};
             dbContext.Hives.Add(hive);
             await dbContext.SaveChangesAsync();
 
@@ -152,7 +162,7 @@ public static class Endpoints
             var hive = await dbContext.Hives.FindAsync(hiveId);
             if (hive is null) return Results.NotFound($"Hive with ID {hiveId} not found.");
             
-            var inspection = new Inspection { Title = dto.Title, Date = dto.Date, Notes = dto.Notes, Hive = hive };
+            var inspection = new Inspection { Title = dto.Title, Date = dto.Date, Notes = dto.Notes, Hive = hive, UserId = ""};
             var apiary = await dbContext.Apiaries.FindAsync(apiaryId);
             hive.Apiary = apiary;
             dbContext.Inspections.Add(inspection);

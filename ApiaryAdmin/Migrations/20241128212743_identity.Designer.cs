@@ -3,6 +3,7 @@ using System;
 using ApiaryAdmin.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ApiaryAdmin.Migrations
 {
     [DbContext(typeof(ApiaryDbContext))]
-    partial class ApiaryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20241128212743_identity")]
+    partial class identity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -185,36 +188,6 @@ namespace ApiaryAdmin.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Inspections");
-                });
-
-            modelBuilder.Entity("ApiaryAdmin.Data.Entities.Session", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset>("InitiatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsRevoked")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("LastRefreshToken")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("Sessions");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -394,17 +367,6 @@ namespace ApiaryAdmin.Migrations
                         .IsRequired();
 
                     b.Navigation("Hive");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("ApiaryAdmin.Data.Entities.Session", b =>
-                {
-                    b.HasOne("ApiaryAdmin.Auth.Model.ApiaryUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
 
                     b.Navigation("User");
                 });

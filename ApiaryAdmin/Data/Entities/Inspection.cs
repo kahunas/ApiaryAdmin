@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using ApiaryAdmin.Auth.Model;
 using ApiaryAdmin.Data.DTOs;
 
 namespace ApiaryAdmin.Data.Entities;
@@ -12,6 +13,10 @@ public class Inspection
 
     public Hive Hive { get; set; }
 
+    [Required]
+    public required string UserId { get; set; }
+
+    public ApiaryUser User { get; set; }
     public InspectionDto ToDto()
     {
         return new InspectionDto(Hive.Id, Id, Title, Date, Notes);

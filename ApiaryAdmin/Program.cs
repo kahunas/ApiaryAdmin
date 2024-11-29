@@ -1,8 +1,15 @@
+using System.Text;
+using ApiaryAdmin.Auth;
+using ApiaryAdmin.Auth.Model;
 using ApiaryAdmin.Data;
 using ApiaryAdmin.Data.Entities;
 using ApiaryAdmin.Helpers;
 using FluentValidation;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using SharpGrip.FluentValidation.AutoValidation.Endpoints.Extensions;
 using SharpGrip.FluentValidation.AutoValidation.Endpoints.Results;
@@ -21,6 +28,29 @@ public class Program
         {
             configuration.OverrideDefaultResultFactoryWith<ProblemDetailsResultFactory>();
         });
+
+        builder.Services.AddTransient<JwtTokenService>();
+        builder.Services.AddTransient<SessionService>();
+        builder.Services.AddScoped<AuthSeeder>();
+        
+        builder.Services.AddIdentity<ApiaryUser, IdentityRole>()
+            .AddEntityFrameworkStores<ApiaryDbContext>()
+            .AddDefaultTokenProviders();
+        
+        builder.Services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+        }).AddJwtBearer(options =>
+        {
+            options.MapInboundClaims = false;
+            options.TokenValidationParameters.ValidAudience = builder.Configuration["Jwt:ValidAudience"];
+            options.TokenValidationParameters.ValidIssuer = builder.Configuration["Jwt:ValidIssuer"];
+            options.TokenValidationParameters.IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Secret"]));
+        });
+
+        builder.Services.AddAuthorization();
         
         // Add Swagger generator to the service collection
         builder.Services.AddEndpointsApiExplorer(); // Required for minimal APIs
@@ -37,15 +67,19 @@ public class Program
                     Email = "your.email@example.com"
                 }
             });
-
-            // Optionally add XML comments
-            //var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-            //ar xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-            //options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
         });
         
         
         var app = builder.Build();
+
+        
+        using var scope = app.Services.CreateScope();
+        //var dbContext = scope.ServiceProvider.GetRequiredService<ApiaryDbContext>();
+        //dbContext.Database.Migrate();
+        
+        var dbSeeder = scope.ServiceProvider.GetRequiredService<AuthSeeder>();
+        dbSeeder.SeedAsync();
+
         
         // Configure Swagger middleware
         if (app.Environment.IsDevelopment())
@@ -73,10 +107,12 @@ public class Program
                 await context.Response.WriteAsync(yaml);
             });
         }
-        
+        app.AddAuthApi();
         app.AddApiaryApi();
         app.AddHiveApi();
         app.AddInspectionApi();
+        app.UseAuthentication();
+        app.UseAuthorization();
         app.Run();
     }
 }
