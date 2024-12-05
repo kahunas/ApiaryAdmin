@@ -21,12 +21,20 @@ public class Program
 {
     public static void Main(string[] args)
     {
-        var builder = WebApplication.CreateBuilder(args);
+        var builder = WebApplication.CreateBuilder(args); 
         builder.Services.AddDbContext<ApiaryDbContext>();
         builder.Services.AddValidatorsFromAssemblyContaining<Program>();
         builder.Services.AddFluentValidationAutoValidation(configuration =>
         {
             configuration.OverrideDefaultResultFactoryWith<ProblemDetailsResultFactory>();
+        });
+
+        builder.Services.AddCors(options =>
+        {
+            options.AddDefaultPolicy(policy =>
+            {
+                policy.WithOrigins("*").AllowAnyHeader().AllowAnyMethod();
+            });
         });
 
         builder.Services.AddTransient<JwtTokenService>();
@@ -71,11 +79,11 @@ public class Program
         
         
         var app = builder.Build();
-
+        app.UseCors();
         
         using var scope = app.Services.CreateScope();
-        //var dbContext = scope.ServiceProvider.GetRequiredService<ApiaryDbContext>();
-        //dbContext.Database.Migrate();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApiaryDbContext>();
+        dbContext.Database.Migrate();
         
         var dbSeeder = scope.ServiceProvider.GetRequiredService<AuthSeeder>();
         dbSeeder.SeedAsync();

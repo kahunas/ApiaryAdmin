@@ -56,19 +56,26 @@ public static class Endpoints
             await dbContext.SaveChangesAsync();
             return TypedResults.Ok(apiary.ToDto());
         });
-        apiariesGroups.MapDelete("/apiaries/{apiaryId}", async (int apiaryId, ApiaryDbContext dbContext) =>
+        apiariesGroups.MapDelete("/apiaries/{apiaryId}", [Authorize] async (int apiaryId, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
             var apiary = await dbContext.Apiaries.FindAsync(apiaryId);
             if (apiary is null)
             {
                 return Results.NotFound();
             }
-            
+
+            // Ensure the user is an admin or the owner of the apiary
+            if (!httpContext.User.IsInRole(ApiaryRoles.Admin) && httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub) != apiary.UserId)
+            {
+                return Results.Forbid();
+            }
+    
             dbContext.Apiaries.Remove(apiary);
             await dbContext.SaveChangesAsync();
-            
+    
             return TypedResults.NoContent();
         });
+
     }
 
     public static void AddHiveApi(this WebApplication app)
@@ -95,47 +102,73 @@ public static class Endpoints
             return TypedResults.Ok(hive.ToDto());
         });
 
-        hivesGroups.MapPost("/hives", async (int apiaryId, CreateHiveDto dto, ApiaryDbContext dbContext) =>
+        hivesGroups.MapPost("/hives", [Authorize] async (int apiaryId, CreateHiveDto dto, HttpContext httpContext, ApiaryDbContext dbContext) =>
+    {
+        var apiary = await dbContext.Apiaries.FindAsync(apiaryId);
+        if (apiary is null)
         {
-            var apiary = await dbContext.Apiaries.FindAsync(apiaryId);
-            if (apiary is null)
-            {
-                return Results.NotFound($"Apiary with ID {apiaryId} not found.");
-            }
+            return Results.NotFound($"Apiary with ID {apiaryId} not found.");
+        }
 
-            dbContext.Entry(apiary).State = EntityState.Unchanged;  // Ensure Apiary is tracked
-
-            var hive = new Hive { Name = dto.Name, Description = dto.Description, Apiary = apiary, UserId = ""};
-            dbContext.Hives.Add(hive);
-            await dbContext.SaveChangesAsync();
-
-            return TypedResults.Created($"/api/apiaries/{apiaryId}/hives/{hive.Id}", hive.ToDto());
-        });
-        hivesGroups.MapPut("/hives/{hiveId}", async (int apiaryId, int hiveId, UpdateHiveDto dto, ApiaryDbContext dbContext) =>
+        // Authorization: Ensure user is the owner of the apiary or an admin
+        if (!httpContext.User.IsInRole(ApiaryRoles.Admin) && httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub) != apiary.UserId)
         {
-            var hive = await dbContext.Hives.Where(h => h.Id == hiveId && h.Apiary.Id == apiaryId).FirstOrDefaultAsync();
-            if (hive is null) return Results.NotFound();
+            return Results.Forbid();
+        }
 
-            hive.Name = dto.Name;
-            hive.Description = dto.Description;
-            
-            var apiary = await dbContext.Apiaries.FindAsync(apiaryId);
-            hive.Apiary = apiary;
-            
-            dbContext.Hives.Update(hive);
-            await dbContext.SaveChangesAsync();
-            return TypedResults.Ok(hive.ToDto());
-        });
-        hivesGroups.MapDelete("/hives/{hiveId}", async (int apiaryId, int hiveId, ApiaryDbContext dbContext) =>
+        dbContext.Entry(apiary).State = EntityState.Unchanged; // Ensure Apiary is tracked
+
+        var hive = new Hive
         {
-            var hive = await dbContext.Hives.Where(h => h.Id == hiveId && h.Apiary.Id == apiaryId).FirstOrDefaultAsync();
-            if (hive is null) return Results.NotFound();
-            
-            dbContext.Hives.Remove(hive);
-            await dbContext.SaveChangesAsync();
-            
-            return TypedResults.NoContent();
-        });
+            Name = dto.Name,
+            Description = dto.Description,
+            Apiary = apiary,
+            UserId = httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub) // Associate with user
+        };
+        dbContext.Hives.Add(hive);
+        await dbContext.SaveChangesAsync();
+
+        return TypedResults.Created($"/api/apiaries/{apiaryId}/hives/{hive.Id}", hive.ToDto());
+    });
+
+    hivesGroups.MapPut("/hives/{hiveId}", [Authorize] async (int apiaryId, int hiveId, UpdateHiveDto dto, HttpContext httpContext, ApiaryDbContext dbContext) =>
+    {
+        var hive = await dbContext.Hives.Where(h => h.Id == hiveId && h.Apiary.Id == apiaryId).FirstOrDefaultAsync();
+        if (hive is null) return Results.NotFound();
+
+        // Authorization: Ensure user is the owner of the hive or an admin
+        if (!httpContext.User.IsInRole(ApiaryRoles.Admin) && httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub) != hive.UserId)
+        {
+            return Results.Forbid();
+        }
+
+        hive.Name = dto.Name;
+        hive.Description = dto.Description;
+
+        var apiary = await dbContext.Apiaries.FindAsync(apiaryId);
+        hive.Apiary = apiary;
+
+        dbContext.Hives.Update(hive);
+        await dbContext.SaveChangesAsync();
+        return TypedResults.Ok(hive.ToDto());
+    });
+
+    hivesGroups.MapDelete("/hives/{hiveId}", [Authorize] async (int apiaryId, int hiveId, HttpContext httpContext, ApiaryDbContext dbContext) =>
+    {
+        var hive = await dbContext.Hives.Where(h => h.Id == hiveId && h.Apiary.Id == apiaryId).FirstOrDefaultAsync();
+        if (hive is null) return Results.NotFound();
+
+        // Authorization: Ensure user is the owner of the hive or an admin
+        if (!httpContext.User.IsInRole(ApiaryRoles.Admin) && httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub) != hive.UserId)
+        {
+            return Results.Forbid();
+        }
+
+        dbContext.Hives.Remove(hive);
+        await dbContext.SaveChangesAsync();
+
+        return TypedResults.NoContent();
+    });
     }
 
     public static void AddInspectionApi(this WebApplication app)
@@ -157,10 +190,16 @@ public static class Endpoints
             inspection.Hive = hive;
             return TypedResults.Ok(inspection.ToDto());
         });
-        inspectionGroups.MapPost("/inspections", async (int apiaryId, int hiveId, CreateInspectionDto dto, ApiaryDbContext dbContext) =>
+        inspectionGroups.MapPost("/inspections", [Authorize] async (int apiaryId, int hiveId, CreateInspectionDto dto, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
             var hive = await dbContext.Hives.FindAsync(hiveId);
             if (hive is null) return Results.NotFound($"Hive with ID {hiveId} not found.");
+            
+            // Authorization: Ensure user is the owner of the hive or an admin
+            if (!httpContext.User.IsInRole(ApiaryRoles.Admin) && httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub) != hive.UserId)
+            {
+                return Results.Forbid();
+            }
             
             var inspection = new Inspection { Title = dto.Title, Date = dto.Date, Notes = dto.Notes, Hive = hive, UserId = ""};
             var apiary = await dbContext.Apiaries.FindAsync(apiaryId);
@@ -170,29 +209,44 @@ public static class Endpoints
             
             return TypedResults.Created($"/api/apiaries/{hive.Apiary.Id}/hives/{hive.Id}/inspections/{inspection.Id}", inspection.ToDto());//added slash before
         });
-        inspectionGroups.MapPut("/inspections/{inspectionId}", async (int hiveId, int inspectionId, UpdateInspectionDto dto, ApiaryDbContext dbContext) =>
+        inspectionGroups.MapPut("/inspections/{inspectionId}", [Authorize] async (int hiveId, int inspectionId, UpdateInspectionDto dto, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
             var inspection = await dbContext.Inspections.Where(i => i.Id == inspectionId && i.Hive.Id == hiveId).FirstOrDefaultAsync();
             if (inspection is null) return Results.NotFound();
-            var hive = await dbContext.Hives.FindAsync(hiveId);
-            inspection.Hive = hive;
 
+            var hive = await dbContext.Hives.FindAsync(hiveId);
+            if (hive is null) return Results.NotFound($"Hive with ID {hiveId} not found.");
+
+            // Authorization: Ensure user is the owner of the inspection or an admin
+            if (!httpContext.User.IsInRole(ApiaryRoles.Admin) && httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub) != inspection.UserId)
+            {
+                return Results.Forbid();
+            }
+
+            inspection.Hive = hive;
             inspection.Title = dto.Title;
             inspection.Date = dto.Date;
             inspection.Notes = dto.Notes;
-            
+
             dbContext.Inspections.Update(inspection);
             await dbContext.SaveChangesAsync();
             return TypedResults.Ok(inspection.ToDto());
         });
-        inspectionGroups.MapDelete("/inspections/{inspectionId}", async (int hiveId, int inspectionId, ApiaryDbContext dbContext) =>
+
+        inspectionGroups.MapDelete("/inspections/{inspectionId}", [Authorize] async (int hiveId, int inspectionId, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
             var inspection = await dbContext.Inspections.Where(i => i.Id == inspectionId && i.Hive.Id == hiveId).FirstOrDefaultAsync();
             if (inspection is null) return Results.NotFound();
-            
+
+            // Authorization: Ensure user is the owner of the inspection or an admin
+            if (!httpContext.User.IsInRole(ApiaryRoles.Admin) && httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub) != inspection.UserId)
+            {
+                return Results.Forbid();
+            }
+
             dbContext.Inspections.Remove(inspection);
             await dbContext.SaveChangesAsync();
-            
+
             return TypedResults.NoContent();
         });
     }
