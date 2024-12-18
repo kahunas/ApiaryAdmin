@@ -15,16 +15,51 @@ public static class Endpoints
     public static void AddApiaryApi(this WebApplication app)
     {
         var apiariesGroups = app.MapGroup("/api").AddFluentValidationAutoValidation();
-
-        apiariesGroups.MapGet("/apiaries", async (ApiaryDbContext dbContext) =>
+        apiariesGroups.MapGet("/apiaries", async (HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
-            return (await dbContext.Apiaries.ToListAsync()).Select(apiary => apiary.ToDto());
+            // Check if the user is authenticated
+            if (httpContext.User.Identity?.IsAuthenticated == true)
+            {
+                // Check if the user is an admin
+                if (httpContext.User.IsInRole(ApiaryRoles.Admin))
+                {
+                    // Admin sees everything
+                    var apiaries = await dbContext.Apiaries.ToListAsync();
+                    return TypedResults.Ok(apiaries.Select(apiary => apiary.ToDto()));
+                }
+                else
+                {
+                    // Authenticated user sees only their own apiaries
+                    var userId = httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+                    var apiaries = await dbContext.Apiaries.Where(a => a.UserId == userId).ToListAsync();
+                    return TypedResults.Ok(apiaries.Select(apiary => apiary.ToDto()));
+                }
+            }
+            else
+            {
+                // Unauthenticated users see all apiaries
+                var apiaries = await dbContext.Apiaries.ToListAsync();
+                return TypedResults.Ok(apiaries.Select(apiary => apiary.ToDto()));
+            }
         });
-        apiariesGroups.MapGet("/apiaries/{apiaryId}", async (int apiaryId, ApiaryDbContext dbContext) =>
+        apiariesGroups.MapGet("/apiaries/{apiaryId}", async (int apiaryId, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
             var apiary = await dbContext.Apiaries.FindAsync(apiaryId);
-            return apiary is null ? Results.NotFound() : TypedResults.Ok(apiary.ToDto());
+            if (apiary is null) return Results.NotFound();
+
+            // If user is authenticated, enforce view restrictions
+            if (httpContext.User.Identity?.IsAuthenticated == true && !httpContext.User.IsInRole(ApiaryRoles.Admin))
+            {
+                var userId = httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+                if (apiary.UserId != userId)
+                {
+                    return Results.Forbid(); // Prevent non-owners from seeing another user's apiary
+                }
+            }
+
+            return TypedResults.Ok(apiary.ToDto());
         });
+
         apiariesGroups.MapPost("/apiaries", [Authorize(Roles = ApiaryRoles.ApiaryUser)] async (CreateApiaryDto dto, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
             var apiary = new Apiary { Name = dto.Name, Location = dto.Location, Description = dto.Description, CreationDate = DateTimeOffset.UtcNow,
@@ -82,14 +117,33 @@ public static class Endpoints
     {
         var hivesGroups = app.MapGroup("/api/apiaries/{apiaryId}").AddFluentValidationAutoValidation();
 
-        hivesGroups.MapGet("/hives", async (int apiaryId, ApiaryDbContext dbContext) =>
+        hivesGroups.MapGet("/hives", async (int apiaryId, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
-            var apiary = await dbContext.Apiaries.FindAsync(apiaryId);
-            if (apiary is null) return Results.NotFound();
-            var hives = (await dbContext.Hives.Where(h => h.Apiary.Id == apiaryId).ToListAsync()).Select(hive => hive.ToDto());
-            return TypedResults.Ok(hives);
+            if (httpContext.User.Identity?.IsAuthenticated == true)
+            {
+                if (httpContext.User.IsInRole(ApiaryRoles.Admin))
+                {
+                    // Admins see all hives
+                    var hives = await dbContext.Hives.Where(h => h.Apiary.Id == apiaryId).ToListAsync();
+                    return TypedResults.Ok(hives.Select(h => h.ToDto()));
+                }
+                else
+                {
+                    // Authenticated users see only their own hives
+                    var userId = httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+                    var hives = await dbContext.Hives.Where(h => h.Apiary.Id == apiaryId && h.UserId == userId).ToListAsync();
+                    return TypedResults.Ok(hives.Select(h => h.ToDto()));
+                }
+            }
+            else
+            {
+                // Unauthenticated users see all hives
+                var hives = await dbContext.Hives.Where(h => h.Apiary.Id == apiaryId).ToListAsync();
+                return TypedResults.Ok(hives.Select(h => h.ToDto()));
+            }
         });
-        hivesGroups.MapGet("/hives/{hiveId}", async (int apiaryId, int hiveId, ApiaryDbContext dbContext) =>
+
+        hivesGroups.MapGet("/hives/{hiveId}", async (int apiaryId, int hiveId, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
             var hive = await dbContext.Hives.FirstOrDefaultAsync(h => h.Id == hiveId && h.Apiary.Id == apiaryId);
             if (hive is null)
@@ -97,10 +151,19 @@ public static class Endpoints
                 return Results.NotFound();
             }
 
-            var apiary = await dbContext.Apiaries.FindAsync(apiaryId);
-            hive.Apiary = apiary;
+            // If user is authenticated, enforce view restrictions
+            if (httpContext.User.Identity?.IsAuthenticated == true && !httpContext.User.IsInRole(ApiaryRoles.Admin))
+            {
+                var userId = httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+                if (hive.UserId != userId)
+                {
+                    return Results.Forbid(); // Prevent non-owners from seeing another user's hive
+                }
+            }
+
             return TypedResults.Ok(hive.ToDto());
         });
+
 
         hivesGroups.MapPost("/hives", [Authorize] async (int apiaryId, CreateHiveDto dto, HttpContext httpContext, ApiaryDbContext dbContext) =>
     {
@@ -174,22 +237,57 @@ public static class Endpoints
     public static void AddInspectionApi(this WebApplication app)
     {
         var inspectionGroups = app.MapGroup("/api/apiaries/{apiaryId}/hives/{hiveId}").AddFluentValidationAutoValidation();
-        
-        inspectionGroups.MapGet("/inspections", async (int hiveId, ApiaryDbContext dbContext) =>
+
+        inspectionGroups.MapGet("/inspections", async (int hiveId, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
-            var hive = await dbContext.Hives.FindAsync(hiveId);
-            if (hive is null) return Results.NotFound();
-            var inspections = (await dbContext.Inspections.Where(i => i.Hive.Id == hiveId).ToListAsync()).Select(inspection => inspection.ToDto());
-            return TypedResults.Ok(inspections);
+            if (httpContext.User.Identity?.IsAuthenticated == true)
+            {
+                if (httpContext.User.IsInRole(ApiaryRoles.Admin))
+                {
+                    // Admins see all inspections
+                    var inspections = await dbContext.Inspections.Where(i => i.Hive.Id == hiveId).ToListAsync();
+                    return TypedResults.Ok(inspections.Select(i => i.ToDto()));
+                }
+                else
+                {
+                    // Authenticated users see only their own inspections
+                    var userId = httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+                    var inspections = await dbContext.Inspections.Where(i => i.Hive.Id == hiveId && i.UserId == userId).ToListAsync();
+                    return TypedResults.Ok(inspections.Select(i => i.ToDto()));
+                }
+            }
+            else
+            {
+                // Unauthenticated users see all inspections
+                var inspections = await dbContext.Inspections.Where(i => i.Hive.Id == hiveId).ToListAsync();
+                return TypedResults.Ok(inspections.Select(i => i.ToDto()));
+            }
         });
-        inspectionGroups.MapGet("/inspections/{inspectionId}", async (int hiveId, int inspectionId, ApiaryDbContext dbContext) =>
+
+        inspectionGroups.MapGet("/inspections/{inspectionId}", async (int hiveId, int inspectionId, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
-            var inspection = await dbContext.Inspections.Where(i => i.Id == inspectionId && i.Hive.Id == hiveId).FirstOrDefaultAsync();
-            if (inspection is null) return Results.NotFound();
-            var hive = await dbContext.Hives.FindAsync(hiveId);
-            inspection.Hive = hive;
+            var inspection = await dbContext.Inspections
+                .Where(i => i.Id == inspectionId && i.Hive.Id == hiveId)
+                .FirstOrDefaultAsync();
+
+            if (inspection is null)
+            {
+                return Results.NotFound();
+            }
+
+            // If user is authenticated, enforce view restrictions
+            if (httpContext.User.Identity?.IsAuthenticated == true && !httpContext.User.IsInRole(ApiaryRoles.Admin))
+            {
+                var userId = httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+                if (inspection.UserId != userId)
+                {
+                    return Results.Forbid(); // Prevent non-owners from seeing another user's inspection
+                }
+            }
+
             return TypedResults.Ok(inspection.ToDto());
         });
+
         inspectionGroups.MapPost("/inspections", [Authorize] async (int apiaryId, int hiveId, CreateInspectionDto dto, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
             var hive = await dbContext.Hives.FindAsync(hiveId);
