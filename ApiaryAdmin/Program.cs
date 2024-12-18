@@ -67,7 +67,6 @@ public class Program
         var dbContext = scope.ServiceProvider.GetRequiredService<ApiaryDbContext>();
         dbContext.Database.Migrate();
         
-
         var dbSeeder = scope.ServiceProvider.GetRequiredService<AuthSeeder>();
         dbSeeder.SeedAsync();
 
