@@ -1,22 +1,14 @@
-name: Build and deploy .NET Core application to Web App apiaryadmin with API Management Service ApiaryAdminapi-ApiaryAdmin
-
+name: Build and deploy .NET Core application to Web App apiaryadmin
 on:
   push:
     branches:
     - main
-
 env:
   AZURE_WEBAPP_NAME: apiaryadmin
-  AZURE_WEBAPP_PACKAGE_PATH: ApiaryAdmin/publish
-  AZURE_APIM_RESOURCE_PATH: /
-  AZURE_APIM_RESOURCEGROUP: apiaryadmin
-  AZURE_APIM_SERVICENAME: ApiaryAdminapi
-  AZURE_APIM_API_ID: ApiaryAdmin
-  AZURE_APIM_APPSERVICEURL: https://apiaryadmin.azurewebsites.net:80/
+  AZURE_WEBAPP_PACKAGE_PATH: ApiaryAdmin/published
   CONFIGURATION: Release
   DOTNET_CORE_VERSION: 8.0.x
   WORKING_DIRECTORY: ApiaryAdmin
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,13 +19,13 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_CORE_VERSION }}
     - name: Restore
-      run: dotnet restore ${{ env.WORKING_DIRECTORY }}
+      run: dotnet restore "${{ env.WORKING_DIRECTORY }}"
     - name: Build
-      run: dotnet build ${{ env.WORKING_DIRECTORY }} --configuration ${{ env.CONFIGURATION }} --no-restore
+      run: dotnet build "${{ env.WORKING_DIRECTORY }}" --configuration ${{ env.CONFIGURATION }} --no-restore
     - name: Test
-      run: dotnet test ${{ env.WORKING_DIRECTORY }} --no-build
+      run: dotnet test "${{ env.WORKING_DIRECTORY }}" --no-build
     - name: Publish
-      run: dotnet publish ${{ env.WORKING_DIRECTORY }} --configuration ${{ env.CONFIGURATION }} --no-build --output ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+      run: dotnet publish "${{ env.WORKING_DIRECTORY }}" --configuration ${{ env.CONFIGURATION }} --no-build --output "${{ env.AZURE_WEBAPP_PACKAGE_PATH }}"
     - name: Publish Artifacts
       uses: actions/upload-artifact@v3
       with:
@@ -52,14 +44,5 @@ jobs:
       uses: azure/webapps-deploy@v2
       with:
         app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.apiaryadmin_B881 }}
         package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
-        publish-profile: ${{ secrets.apiaryadmin_D5F0 }}
-    - name: Azure Login
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.ApiaryAdminapi_SPN }}
-    - name: Import API into Azure API Management
-      run: az apim api import --path "${{ env.AZURE_APIM_RESOURCE_PATH }}" --resource-group "${{ env.AZURE_APIM_RESOURCEGROUP }}" --service-name "${{ env.AZURE_APIM_SERVICENAME }}" --api-id "${{ env.AZURE_APIM_API_ID }}" --service-url "${{ env.AZURE_APIM_APPSERVICEURL }}" --specification-format OpenApi --subscription-required false
-    - name: logout
-      run: >
-        az logout
