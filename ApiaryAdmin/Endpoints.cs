@@ -124,28 +124,28 @@ public static class Endpoints
                 if (httpContext.User.IsInRole(ApiaryRoles.Admin))
                 {
                     // Admins see all hives
-                    var hives = await dbContext.Hives.Where(h => h.Apiary.Id == apiaryId).ToListAsync();
+                    var hives = await dbContext.Hives.Include(h => h.Apiary).Where(h => h.Apiary.Id == apiaryId).ToListAsync();
                     return TypedResults.Ok(hives.Select(h => h.ToDto()));
                 }
                 else
                 {
                     // Authenticated users see only their own hives
                     var userId = httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-                    var hives = await dbContext.Hives.Where(h => h.Apiary.Id == apiaryId && h.UserId == userId).ToListAsync();
+                    var hives = await dbContext.Hives.Include(h => h.Apiary).Where(h => h.Apiary.Id == apiaryId).ToListAsync();
                     return TypedResults.Ok(hives.Select(h => h.ToDto()));
                 }
             }
             else
             {
                 // Unauthenticated users see all hives
-                var hives = await dbContext.Hives.Where(h => h.Apiary.Id == apiaryId).ToListAsync();
+                var hives = await dbContext.Hives.Include(h => h.Apiary).Where(h => h.Apiary.Id == apiaryId).ToListAsync();
                 return TypedResults.Ok(hives.Select(h => h.ToDto()));
             }
         });
 
         hivesGroups.MapGet("/hives/{hiveId}", async (int apiaryId, int hiveId, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
-            var hive = await dbContext.Hives.FirstOrDefaultAsync(h => h.Id == hiveId && h.Apiary.Id == apiaryId);
+            var hive = await dbContext.Hives.Include(h => h.Apiary).FirstOrDefaultAsync(h => h.Id == hiveId && h.Apiary.Id == apiaryId);
             if (hive is null)
             {
                 return Results.NotFound();
@@ -196,7 +196,7 @@ public static class Endpoints
 
     hivesGroups.MapPut("/hives/{hiveId}", [Authorize] async (int apiaryId, int hiveId, UpdateHiveDto dto, HttpContext httpContext, ApiaryDbContext dbContext) =>
     {
-        var hive = await dbContext.Hives.Where(h => h.Id == hiveId && h.Apiary.Id == apiaryId).FirstOrDefaultAsync();
+        var hive = await dbContext.Hives.Include(h => h.Apiary).FirstOrDefaultAsync(h => h.Id == hiveId && h.Apiary.Id == apiaryId);
         if (hive is null) return Results.NotFound();
 
         // Authorization: Ensure user is the owner of the hive or an admin
@@ -218,7 +218,7 @@ public static class Endpoints
 
     hivesGroups.MapDelete("/hives/{hiveId}", [Authorize] async (int apiaryId, int hiveId, HttpContext httpContext, ApiaryDbContext dbContext) =>
     {
-        var hive = await dbContext.Hives.Where(h => h.Id == hiveId && h.Apiary.Id == apiaryId).FirstOrDefaultAsync();
+        var hive = await dbContext.Hives.Include(h => h.Apiary).FirstOrDefaultAsync(h => h.Id == hiveId && h.Apiary.Id == apiaryId);
         if (hive is null) return Results.NotFound();
 
         // Authorization: Ensure user is the owner of the hive or an admin
