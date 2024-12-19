@@ -245,30 +245,28 @@ public static class Endpoints
                 if (httpContext.User.IsInRole(ApiaryRoles.Admin))
                 {
                     // Admins see all inspections
-                    var inspections = await dbContext.Inspections.Where(i => i.Hive.Id == hiveId).ToListAsync();
+                    var inspections = await dbContext.Inspections.Include(i => i.Hive).ThenInclude(h => h.Apiary).Where(i => i.Hive.Id == hiveId).ToListAsync();
                     return TypedResults.Ok(inspections.Select(i => i.ToDto()));
                 }
                 else
                 {
                     // Authenticated users see only their own inspections
                     var userId = httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-                    var inspections = await dbContext.Inspections.Where(i => i.Hive.Id == hiveId && i.UserId == userId).ToListAsync();
+                    var inspections = await dbContext.Inspections.Include(i => i.Hive).ThenInclude(h => h.Apiary).Where(i => i.Hive.Id == hiveId).ToListAsync();
                     return TypedResults.Ok(inspections.Select(i => i.ToDto()));
                 }
             }
             else
             {
                 // Unauthenticated users see all inspections
-                var inspections = await dbContext.Inspections.Where(i => i.Hive.Id == hiveId).ToListAsync();
+                var inspections = await dbContext.Inspections.Include(i => i.Hive).ThenInclude(h => h.Apiary).Where(i => i.Hive.Id == hiveId).ToListAsync();
                 return TypedResults.Ok(inspections.Select(i => i.ToDto()));
             }
         });
 
         inspectionGroups.MapGet("/inspections/{inspectionId}", async (int hiveId, int inspectionId, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
-            var inspection = await dbContext.Inspections
-                .Where(i => i.Id == inspectionId && i.Hive.Id == hiveId)
-                .FirstOrDefaultAsync();
+            var inspection = await dbContext.Inspections.Include(i => i.Hive).ThenInclude(h => h.Apiary).FirstOrDefaultAsync(i => i.Id == inspectionId && i.Hive.Id == hiveId);
 
             if (inspection is null)
             {
@@ -309,7 +307,7 @@ public static class Endpoints
         });
         inspectionGroups.MapPut("/inspections/{inspectionId}", [Authorize] async (int hiveId, int inspectionId, UpdateInspectionDto dto, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
-            var inspection = await dbContext.Inspections.Where(i => i.Id == inspectionId && i.Hive.Id == hiveId).FirstOrDefaultAsync();
+            var inspection = await dbContext.Inspections.Include(i => i.Hive).ThenInclude(h => h.Apiary).FirstOrDefaultAsync(i => i.Id == inspectionId && i.Hive.Id == hiveId);
             if (inspection is null) return Results.NotFound();
 
             var hive = await dbContext.Hives.FindAsync(hiveId);
@@ -333,7 +331,7 @@ public static class Endpoints
 
         inspectionGroups.MapDelete("/inspections/{inspectionId}", [Authorize] async (int hiveId, int inspectionId, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
-            var inspection = await dbContext.Inspections.Where(i => i.Id == inspectionId && i.Hive.Id == hiveId).FirstOrDefaultAsync();
+            var inspection = await dbContext.Inspections.Include(i => i.Hive).ThenInclude(h => h.Apiary).FirstOrDefaultAsync(i => i.Id == inspectionId && i.Hive.Id == hiveId);
             if (inspection is null) return Results.NotFound();
 
             // Authorization: Ensure user is the owner of the inspection or an admin
