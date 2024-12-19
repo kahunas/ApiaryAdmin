@@ -288,23 +288,44 @@ public static class Endpoints
 
         inspectionGroups.MapPost("/inspections", [Authorize] async (int apiaryId, int hiveId, CreateInspectionDto dto, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
-            var hive = await dbContext.Hives.FindAsync(hiveId);
-            if (hive is null) return Results.NotFound($"Hive with ID {hiveId} not found.");
-            
+            var hive = await dbContext.Hives
+                .Include(h => h.Apiary) // ✅ Ensure Apiary is loaded
+                .FirstOrDefaultAsync(h => h.Id == hiveId);
+
+            if (hive is null)
+                return Results.NotFound($"Hive with ID {hiveId} not found.");
+
             // Authorization: Ensure user is the owner of the hive or an admin
-            if (!httpContext.User.IsInRole(ApiaryRoles.Admin) && httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub) != hive.UserId)
+            var userId = httpContext.User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+            if (!httpContext.User.IsInRole(ApiaryRoles.Admin) && userId != hive.UserId)
             {
                 return Results.Forbid();
             }
-            
-            var inspection = new Inspection { Title = dto.Title, Date = dto.Date, Notes = dto.Notes, Hive = hive, UserId = ""};
-            var apiary = await dbContext.Apiaries.FindAsync(apiaryId);
-            hive.Apiary = apiary;
+
+            // ✅ Correctly set UserId from authenticated user
+            var inspection = new Inspection
+            {
+                Title = dto.Title,
+                Date = dto.Date,
+                Notes = dto.Notes,
+                Hive = hive,
+                UserId = userId // ✅ Correctly assign user ID
+            };
+
             dbContext.Inspections.Add(inspection);
-            await dbContext.SaveChangesAsync();
-            
-            return TypedResults.Created($"/api/apiaries/{hive.Apiary.Id}/hives/{hive.Id}/inspections/{inspection.Id}", inspection.ToDto());//added slash before
+
+            try
+            {
+                await dbContext.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                return Results.Problem($"An error occurred while saving the inspection: {ex.Message}");
+            }
+
+            return TypedResults.Created($"/api/apiaries/{hive.Apiary.Id}/hives/{hive.Id}/inspections/{inspection.Id}", inspection.ToDto());
         });
+
         inspectionGroups.MapPut("/inspections/{inspectionId}", [Authorize] async (int hiveId, int inspectionId, UpdateInspectionDto dto, HttpContext httpContext, ApiaryDbContext dbContext) =>
         {
             var inspection = await dbContext.Inspections.Include(i => i.Hive).ThenInclude(h => h.Apiary).FirstOrDefaultAsync(i => i.Id == inspectionId && i.Hive.Id == hiveId);
